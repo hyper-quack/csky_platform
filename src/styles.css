@@ -1,0 +1,376 @@
+/* CSKY Platform — Global Styles
+   Design system extracted from Project Nullframe + drone GCS layout */
+
+/* ── Design Tokens ── */
+:root{
+  --black:#000;--surface:#0d0d0d;--surface-raised:#151515;
+  --border:#1a1a1a;--border-visible:#2a2a2a;
+  --text-disabled:#555;--text-secondary:#888;--text-primary:#d8d8d8;--text-display:#f0f0f0;
+  --accent:#f26522;--accent-red:#d71921;--success:#4a9e5c;
+  --ease:cubic-bezier(.4,0,.2,1);--ease-back:cubic-bezier(.34,1.56,.64,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  background:var(--black);min-height:100dvh;
+  font-family:'Space Grotesk',sans-serif;color:var(--text-primary);
+  -webkit-font-smoothing:antialiased;overflow-x:hidden;
+}
+#root{width:100%;min-height:100dvh;display:flex;flex-direction:column}
+
+/* ── Status Bar ── */
+.status-bar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 20px;
+  background:linear-gradient(180deg,#111 0%,#0a0a0a 100%);
+  border-bottom:1px solid var(--border);
+  z-index:10;flex:none;
+}
+.sb-left{display:flex;align-items:center;gap:18px}
+.sb-logo{display:flex;align-items:center;gap:10px}
+.sb-brand{
+  font:600 16px/1 'Space Grotesk',sans-serif;letter-spacing:.08em;
+  color:var(--accent);text-transform:uppercase;
+}
+.sb-search{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 14px;border-radius:6px;
+  background:var(--surface);border:1px solid var(--border);
+  font:400 12px/1 'Space Mono',monospace;color:var(--text-disabled);
+  cursor:pointer;transition:border-color .15s;
+}
+.sb-search:hover{border-color:var(--border-visible)}
+.sb-center{display:flex;align-items:center;gap:24px}
+.sb-stat{display:flex;align-items:center;gap:6px;font:500 13px/1 'Space Mono',monospace;color:var(--text-primary)}
+.sb-stat svg{color:var(--text-secondary)}
+.sb-unit{font-size:10px;color:var(--text-secondary);text-transform:uppercase}
+.sb-right{display:flex;align-items:center;gap:18px;font:400 12px/1 'Space Mono',monospace}
+.sb-fw{color:var(--text-disabled);letter-spacing:.08em}
+.sb-uptime{color:var(--text-secondary);letter-spacing:.06em}
+.sb-clock{font:500 14px/1 'Space Mono',monospace;color:var(--text-display);letter-spacing:.04em}
+
+/* ── Main Grid Layout ── */
+.platform{
+  flex:1;display:grid;
+  grid-template-columns:1fr 1fr 1fr 1fr 300px;
+  grid-template-rows:auto 1fr auto;
+  grid-template-areas:
+    "info1 info2 info3 info4 drone"
+    "viewport viewport viewport viewport sidebar"
+    "feed feed feed feed sidebottom";
+  gap:1px;
+  background:var(--border);
+  min-height:0;
+}
+
+/* ── Cards (from nullframe) ── */
+.card{
+  position:relative;overflow:hidden;
+  background:var(--surface);border:1px solid var(--border);
+  padding:14px 16px;display:flex;flex-direction:column;
+  transition:border-color .2s ease-out,opacity .45s var(--ease);
+}
+.card:hover{border-color:var(--border-visible)}
+.shine{
+  position:absolute;top:-30%;bottom:-30%;left:-140px;width:110px;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.03) 35%,rgba(255,255,255,.08) 50%,rgba(255,255,255,.03) 65%,transparent);
+  transform:skewX(-14deg);opacity:0;pointer-events:none;z-index:2;
+}
+.shine.play,.card.sweep .shine{animation:shimmer 1.05s var(--ease) forwards}
+@keyframes shimmer{0%{left:-140px;opacity:1}100%{left:110%;opacity:0}}
+.focus .dimmable{opacity:.16}
+
+/* ── Tags / Badges ── */
+.tag{
+  margin-left:auto;
+  font:700 9px/1 'Space Mono',monospace;letter-spacing:.12em;color:var(--text-disabled);
+  opacity:0;transition:opacity .25s var(--ease);
+}
+.card:hover .tag,.tag.always{opacity:1}
+.tag.always{animation:tag-swap .32s var(--ease)}
+@keyframes tag-swap{0%{opacity:0;transform:translateY(-4px)}100%{opacity:1;transform:translateY(0)}}
+.badge{
+  padding:2px 8px;border-radius:3px;
+  font:700 9px/1 'Space Mono',monospace;letter-spacing:.1em;text-transform:uppercase;
+}
+.badge.active{background:var(--accent);color:#000}
+.badge.standby{background:#333;color:var(--text-secondary)}
+.badge.action{background:var(--accent);color:#000}
+
+/* ── Meta / Typography (from nullframe) ── */
+.meta-row{
+  display:flex;justify-content:space-between;align-items:baseline;gap:8px;
+  font:400 10px/1.5 'Space Mono',monospace;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--text-secondary);
+}
+.mono-sub{
+  font:400 10px/1.6 'Space Mono',monospace;letter-spacing:.06em;
+  text-transform:uppercase;color:var(--text-secondary);
+}
+.dim{color:var(--text-disabled)}
+.right{text-align:right}
+.title{font:500 18px/1.2 'Space Grotesk',sans-serif;letter-spacing:-.01em;color:var(--text-display)}
+.nowrap{white-space:nowrap}
+.sq{display:inline-block;width:6px;height:10px;background:var(--accent);margin-left:5px;vertical-align:-1px}
+
+/* ── LED ── */
+.led{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);animation:pulse 2.4s var(--ease) infinite;flex:none}
+.led.red{background:var(--accent-red);width:6px;height:6px;animation-duration:1.6s}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.18}}
+
+/* ── Toggle (from nullframe) ── */
+.toggle{
+  position:relative;width:34px;height:16px;flex:none;
+  background:var(--border-visible);border:none;cursor:pointer;padding:0;
+  transition:background .25s var(--ease);
+}
+.toggle.on{background:var(--accent)}
+.thumb{
+  position:absolute;top:2px;left:2px;width:12px;height:12px;
+  display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:1px;
+  transition:left .28s var(--ease);
+}
+.toggle.on .thumb{left:20px}
+.thumb i{background:var(--text-display);opacity:1;transition:opacity .14s var(--ease)}
+
+/* ── Segbar (from nullframe) ── */
+.segbar{display:flex;gap:2px;height:10px;margin-top:auto}
+.segbar i{
+  flex:1;background:#1e1e1e;transform:scale(.3);opacity:0;
+  animation:seg-in .3s var(--ease-back) forwards;
+}
+.segbar i.on{background:var(--text-primary)}
+.segbar.green i.on{background:var(--success)}
+.segbar.orange i.on{background:var(--accent)}
+@keyframes seg-in{to{transform:scale(1);opacity:1}}
+
+/* ── Metrics (from nullframe) ── */
+.metric{font:700 28px/1 'Space Mono',monospace;letter-spacing:-.02em;color:var(--text-display);margin-top:8px}
+.metric small{font-size:12px;font-weight:400;letter-spacing:.04em;color:var(--text-secondary);margin-left:4px}
+.doto-val{font-family:'Doto',sans-serif;font-weight:400;font-size:42px;line-height:1;color:var(--text-display);margin-top:6px}
+.doto-val small{font-size:16px;font-weight:400;vertical-align:super;color:var(--text-secondary);margin-left:2px}
+.doto-mid{font-family:'Doto',sans-serif;font-weight:400;font-size:34px;line-height:1;color:var(--text-display);font-variant-numeric:tabular-nums}
+.doto-sm{font-family:'Doto',sans-serif;font-weight:400;font-size:24px;line-height:1;color:var(--text-display);font-variant-numeric:tabular-nums}
+canvas{display:block;width:100%;height:100%}
+.canvas-fill{flex:1;min-height:0;margin-top:8px}
+
+/* ── Ring Gauge ── */
+.ring-wrap{position:relative;width:90px;height:90px;margin:2px auto}
+.ring-wrap svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring-bg{fill:none;stroke:#222;stroke-width:5.5}
+.ring-fg{fill:none;stroke:var(--accent);stroke-width:5.5;transition:stroke-dashoffset .5s var(--ease)}
+.ring-val{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font:600 24px/1 'Space Grotesk',sans-serif;letter-spacing:-.01em;color:var(--text-display);
+}
+.ring-val small{font:400 10px/1 'Space Mono',monospace;color:var(--text-secondary);margin-left:4px}
+
+.ring-wrap-sm{position:relative;width:70px;height:70px}
+.ring-wrap-sm svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring-val-sm{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font:500 13px/1 'Space Mono',monospace;color:var(--text-display);
+}
+
+/* ── Info Cards Row ── */
+.mission-card{grid-area:info1}
+.camera-card{grid-area:info2}
+.coverage-card{grid-area:info3}
+.recordings-card{grid-area:info4}
+
+.card-icon{color:var(--accent);margin-right:4px}
+
+.mission-body{display:flex;flex-direction:column;gap:6px;margin-top:8px;flex:1}
+.mission-timer{display:flex;gap:12px;align-items:center}
+.mission-controls{display:flex;gap:6px;margin-top:4px}
+.ctrl-btn{
+  background:var(--surface-raised);border:1px solid var(--border);color:var(--text-secondary);
+  width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+  font-size:10px;cursor:pointer;transition:all .15s;
+}
+.ctrl-btn:hover{border-color:var(--border-visible);color:var(--text-primary)}
+
+.camera-body{display:flex;flex-direction:column;gap:8px;margin-top:8px;flex:1}
+.camera-row{display:flex;align-items:center;gap:10px}
+.camera-row .mono-sub{width:55px;flex:none}
+.toggle-group{display:flex;gap:0}
+.tg-option{
+  padding:3px 10px;
+  font:700 9px/1 'Space Mono',monospace;letter-spacing:.06em;text-transform:uppercase;
+  background:var(--surface-raised);border:1px solid var(--border);color:var(--text-disabled);
+  cursor:pointer;transition:all .15s;
+}
+.tg-option.active{background:var(--accent);color:#000;border-color:var(--accent)}
+.tg-option:first-child{border-radius:3px 0 0 3px}
+.tg-option:last-child{border-radius:0 3px 3px 0}
+
+.coverage-body{display:flex;flex-direction:column;gap:6px;margin-top:8px;flex:1}
+.coverage-row{display:flex;align-items:center;gap:8px}
+.coverage-row .mono-sub:first-child{width:60px;flex:none}
+
+.recordings-body{display:flex;flex-direction:column;gap:5px;margin-top:8px;flex:1}
+.rec-row{display:flex;justify-content:space-between;gap:8px}
+
+/* ── Point Cloud Viewport ── */
+.viewport-area{
+  grid-area:viewport;position:relative;
+  background:var(--surface);overflow:hidden;
+  min-height:350px;
+}
+.point-cloud-viewer{position:absolute;inset:0;display:flex;flex-direction:column}
+.point-cloud-viewer canvas{flex:1}
+.nav-hud{position:absolute;inset:0;pointer-events:none;z-index:5}
+
+.pcv-sidebar{
+  position:absolute;left:10px;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;gap:6px;z-index:6;
+}
+.pcv-icon{
+  width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  background:rgba(13,13,13,.7);border:1px solid var(--border);color:var(--text-secondary);
+  cursor:pointer;transition:all .15s;backdrop-filter:blur(8px);
+}
+.pcv-icon:hover,.pcv-icon.active{color:var(--text-primary);border-color:var(--border-visible)}
+.pcv-icon.active{border-left:2px solid var(--accent)}
+
+.pcv-label{
+  position:absolute;left:52px;top:14px;z-index:6;
+  display:flex;align-items:center;gap:8px;
+  font:400 11px/1 'Space Mono',monospace;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--text-secondary);
+}
+
+.pcv-toolbar{
+  position:absolute;bottom:14px;left:50%;transform:translateX(-50%);
+  display:flex;gap:6px;z-index:6;
+}
+.pcv-tool{
+  width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+  background:rgba(13,13,13,.7);border:1px solid var(--border);color:var(--text-secondary);
+  cursor:pointer;transition:all .15s;backdrop-filter:blur(8px);
+}
+.pcv-tool:hover{color:var(--text-primary);border-color:var(--border-visible)}
+
+/* ── Right Sidebar ── */
+.sidebar-area{
+  grid-area:sidebar;display:flex;flex-direction:column;
+  background:var(--surface);gap:1px;
+  overflow-y:auto;
+}
+
+.sidebottom-area{
+  grid-area:sidebottom;display:flex;flex-direction:column;
+  background:var(--surface);
+}
+
+/* ── Drone Model ── */
+.drone-model-wrap{
+  padding:14px 16px;display:flex;flex-direction:column;
+  border-bottom:1px solid var(--border);
+}
+.drone-scene{
+  display:flex;align-items:center;justify-content:center;
+  height:130px;perspective:400px;
+}
+.drone-body-3d{transition:transform .15s var(--ease);transform-style:preserve-3d}
+.drone-svg .led{animation:pulse 2.4s var(--ease) infinite}
+.drone-info{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.drone-info-row{display:flex;justify-content:space-between;gap:8px}
+
+/* ── IMU Card ── */
+.imu-card{border-bottom:1px solid var(--border)}
+.imu-header{display:flex;justify-content:space-between;align-items:center;margin-top:6px}
+.imu-health{display:flex;align-items:center;gap:5px;font:700 9px/1 'Space Mono',monospace;letter-spacing:.1em;text-transform:uppercase}
+.imu-health.ok{color:var(--success)}
+.imu-health.fail{color:var(--accent-red)}
+.imu-rings{display:flex;gap:12px;justify-content:center;margin:10px 0 6px}
+.imu-ring{display:flex;flex-direction:column;align-items:center;gap:4px}
+.imu-gyro{display:flex;align-items:baseline;gap:6px;justify-content:center;margin-top:4px}
+.imu-sub{margin-top:auto;padding-top:6px}
+
+/* ── Battery Card ── */
+.battery-card{border-bottom:1px solid var(--border)}
+.batt-main{display:flex;gap:16px;align-items:flex-start;margin-top:6px}
+.batt-details{display:flex;flex-direction:column;gap:3px;flex:1}
+.batt-row{display:flex;justify-content:space-between;gap:8px}
+
+/* ── Signal Card ── */
+.signal-card{border-bottom:1px solid var(--border)}
+
+/* ── Attitude Indicator ── */
+.attitude-wrap{
+  padding:14px 16px;display:flex;flex-direction:column;
+  background:var(--surface);border-bottom:1px solid var(--border);
+}
+.attitude-canvas{width:100%;height:180px;margin-top:8px}
+
+/* ── Telemetry Feed ── */
+.telem-feed{grid-area:feed;min-height:0}
+.feed-rows{
+  flex:1;display:flex;flex-direction:column;gap:6px;margin-top:8px;overflow:hidden;
+  font:400 10px/1.5 'Space Mono',monospace;letter-spacing:.03em;color:var(--text-primary);
+}
+.feed-row{display:flex;justify-content:space-between;gap:10px}
+.feed-row .dim{flex:none}
+
+/* ── Command Palette (from nullframe) ── */
+.pal-overlay{
+  position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.65);
+  display:flex;align-items:flex-start;justify-content:center;padding-top:16vh;
+}
+.pal{
+  width:min(540px,92vw);background:var(--surface);
+  border:1px solid var(--border-visible);border-radius:10px;overflow:hidden;
+}
+.pal input{
+  all:unset;display:block;width:100%;box-sizing:border-box;padding:14px 16px;
+  font:400 13px 'Space Mono',monospace;letter-spacing:.04em;color:var(--text-primary);
+  border-bottom:1px solid var(--border);
+}
+.pal-row{
+  display:flex;justify-content:space-between;align-items:center;padding:11px 16px;
+  font:400 11px 'Space Mono',monospace;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--text-secondary);cursor:pointer;
+}
+.pal-row.sel{background:var(--surface-raised);color:var(--text-primary);box-shadow:inset 2px 0 0 var(--accent)}
+.pal-empty{padding:16px;font:400 11px 'Space Mono',monospace;color:var(--text-disabled);letter-spacing:.06em}
+
+/* ── Responsive ── */
+@media (max-width:1200px){
+  .platform{
+    grid-template-columns:1fr 1fr 300px;
+    grid-template-areas:
+      "info1 info2 drone"
+      "info3 info4 drone"
+      "viewport viewport sidebar"
+      "feed feed sidebottom";
+  }
+}
+@media (max-width:940px){
+  .platform{
+    grid-template-columns:1fr 1fr;
+    grid-template-areas:
+      "info1 info2"
+      "info3 info4"
+      "drone drone"
+      "viewport viewport"
+      "sidebar sidebar"
+      "sidebottom sidebottom"
+      "feed feed";
+  }
+  .sidebar-area{flex-direction:row;flex-wrap:wrap}
+  .sidebar-area>*{flex:1;min-width:280px}
+}
+@media (max-width:520px){
+  .platform{
+    grid-template-columns:1fr;
+    grid-template-areas:
+      "info1" "info2" "info3" "info4"
+      "drone" "viewport" "sidebar" "sidebottom" "feed";
+  }
+  .status-bar{flex-wrap:wrap;gap:8px}
+  .sb-center{display:none}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}
+}
