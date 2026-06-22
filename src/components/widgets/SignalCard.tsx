@@ -59,7 +59,7 @@ export function SignalCard({ index }: { index: number }) {
   }, [])
 
   return (
-    <Card index={index} label="RADIO LINK" tag="SIM" tagAlways className="signal-card">
+    <Card index={index} label="RADIO LINK" tag="LIVE" tagAlways className="signal-card">
       <div className="metric">
         {shown}<small>%</small>
       </div>

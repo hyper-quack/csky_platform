@@ -11,7 +11,7 @@ export function BatteryCard({ index }: { index: number }) {
   const shown = useBootNumber(pct)
 
   return (
-    <Card index={index} label="BATTERY" tag="SIM" tagAlways className="battery-card">
+    <Card index={index} label="BATTERY" tag="LIVE" tagAlways className="battery-card">
       <div className="batt-main">
         <div className="doto-val">
           {shown}<small>%</small>

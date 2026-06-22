@@ -1,3 +1,5 @@
+@import './components/connection-styles.css';
+
 /* CSKY Platform — Global Styles
    Design system extracted from Project Nullframe + drone GCS layout */
 
@@ -149,7 +151,7 @@ body{
 .doto-val{font-family:'Doto',sans-serif;font-weight:400;font-size:42px;line-height:1;color:var(--text-display);margin-top:6px}
 .doto-val small{font-size:16px;font-weight:400;vertical-align:super;color:var(--text-secondary);margin-left:2px}
 .doto-mid{font-family:'Doto',sans-serif;font-weight:400;font-size:34px;line-height:1;color:var(--text-display);font-variant-numeric:tabular-nums}
-.doto-sm{font-family:'Doto',sans-serif;font-weight:400;font-size:24px;line-height:1;color:var(--text-display);font-variant-numeric:tabular-nums}
+.doto-sm{font-family:'Doto',sans-serif;font-weight:400;font-size:11px;line-height:1.2;color:var(--text-display);font-variant-numeric:tabular-nums}
 canvas{display:block;width:100%;height:100%}
 .canvas-fill{flex:1;min-height:0;margin-top:8px}
 
@@ -257,6 +259,11 @@ canvas{display:block;width:100%;height:100%}
   overflow-y:auto;
 }
 
+.drone-sidebar-area{
+  grid-area:drone;display:flex;flex-direction:column;
+  background:var(--surface);gap:1px;
+}
+
 .sidebottom-area{
   grid-area:sidebottom;display:flex;flex-direction:column;
   background:var(--surface);
@@ -282,10 +289,14 @@ canvas{display:block;width:100%;height:100%}
 .imu-health{display:flex;align-items:center;gap:5px;font:700 9px/1 'Space Mono',monospace;letter-spacing:.1em;text-transform:uppercase}
 .imu-health.ok{color:var(--success)}
 .imu-health.fail{color:var(--accent-red)}
+.imu-health.unknown{color:var(--text-disabled)}
 .imu-rings{display:flex;gap:12px;justify-content:center;margin:10px 0 6px}
 .imu-ring{display:flex;flex-direction:column;align-items:center;gap:4px}
 .imu-gyro{display:flex;align-items:baseline;gap:6px;justify-content:center;margin-top:4px}
 .imu-sub{margin-top:auto;padding-top:6px}
+.imu-section{margin-top:4px}
+.imu-divider{height:1px;background:var(--border);margin:8px 0 4px}
+.imu-disconnected{padding:8px 0;text-align:center}
 
 /* ── Battery Card ── */
 .battery-card{border-bottom:1px solid var(--border)}
@@ -311,6 +322,15 @@ canvas{display:block;width:100%;height:100%}
 }
 .feed-row{display:flex;justify-content:space-between;gap:10px}
 .feed-row .dim{flex:none}
+.feed-toggle-btn{
+  display:flex;align-items:center;gap:5px;
+  background:var(--surface-raised);border:1px solid var(--border);color:var(--text-secondary);
+  padding:3px 10px;cursor:pointer;
+  font:700 9px/1 'Space Mono',monospace;letter-spacing:.08em;text-transform:uppercase;
+  transition:all .15s;
+}
+.feed-toggle-btn:hover{border-color:var(--border-visible);color:var(--text-primary)}
+.feed-toggle-btn:active{background:var(--accent);color:var(--black);border-color:var(--accent)}
 
 /* ── Command Palette (from nullframe) ── */
 .pal-overlay{
@@ -374,3 +394,4 @@ canvas{display:block;width:100%;height:100%}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:.001s!important;transition-duration:.001s!important}
 }
+

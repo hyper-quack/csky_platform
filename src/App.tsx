@@ -19,12 +19,15 @@ import { AttitudeIndicator } from './components/widgets/AttitudeIndicator'
 import { TelemetryFeed } from './components/widgets/TelemetryFeed'
 import { CommandPalette } from './components/CommandPalette'
 
+import { ConnectionOverlay } from './components/ConnectionOverlay'
+
 export default function App() {
   const [focus, setFocus] = useState(false)
   const [motionOff, setMotionOff] = useState(false)
   const [autoSweep, setAutoSweepState] = useState(false)
   const [soundOn, setSoundOn] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [connected, setConnected] = useState(false)
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -56,6 +59,17 @@ export default function App() {
     [focus, motionOff, autoSweep, soundOn, paletteOpen],
   )
 
+  useEffect(() => {
+    if (connected) {
+      bus.start()
+      return () => bus.stop()
+    }
+  }, [connected])
+
+  if (!connected) {
+    return <ConnectionOverlay onConnected={() => setConnected(true)} />
+  }
+
   return (
     <CtlCtx.Provider value={ctl}>
       <StatusBar />
@@ -67,7 +81,7 @@ export default function App() {
         <RecordingsCard index={3} />
 
         {/* Drone model + battery (top-right) */}
-        <div className="sidebar-area" style={{ gridArea: 'drone' }}>
+        <div className="drone-sidebar-area">
           <DroneModel />
         </div>
 

@@ -161,7 +161,7 @@ export function AttitudeIndicator() {
     <div className="attitude-wrap" id="attitude-indicator">
       <div className="meta-row">
         <span>ATTITUDE</span>
-        <span className="tag always">SIM</span>
+        <span className="tag always">LIVE</span>
       </div>
       <canvas ref={ref} className="attitude-canvas" />
     </div>

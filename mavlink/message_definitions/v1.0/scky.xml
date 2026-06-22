@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<mavlink>
+  <include>common.xml</include>
+  <messages>
+    <message id="42000" name="SCKY_IMU_STATUS">
+      <description>Status for SCKY IMU.</description>
+      <field type="uint32_t" name="time_boot_ms">ms since firmware boot</field>
+      <field type="uint8_t" name="imu_id">0 or 1</field>
+      <field type="uint8_t" name="connected">MAV_BOOL: 0 or 1</field>
+      <field type="uint8_t" name="healthy">MAV_BOOL: 0 or 1</field>
+      <field type="uint8_t" name="whoami">show as hex (for example 0x47)</field>
+    </message>
+  </messages>
+</mavlink>

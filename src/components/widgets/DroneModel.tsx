@@ -14,7 +14,7 @@ export function DroneModel() {
         <div
           className="drone-body-3d"
           style={{
-            transform: `rotateX(${-snap.imu1.pitch * 2}deg) rotateZ(${snap.imu1.roll * 2}deg) rotateY(${snap.flight.heading * 0.5}deg)`,
+            transform: `rotateX(${snap.imu1.roll * 2}deg) rotateY(${snap.imu1.pitch * 2}deg) rotateZ(${snap.flight.heading * 0.5}deg)`,
           }}
         >
           {/* Drone body */}
@@ -48,8 +48,8 @@ export function DroneModel() {
       </div>
       <div className="drone-info">
         <div className="drone-info-row">
-          <span className="mono-sub" style={{ color: '#4a9e5c' }}>■</span>
-          <span className="mono-sub">{snap.battery.mAh} / {Math.round(snap.battery.mAh / (snap.battery.percent / 100))} mAh</span>
+          <span className="mono-sub" style={{ color: snap.imu1.connected ? '#4a9e5c' : '#d71921' }}>{snap.imu1.connected ? '■' : '■'}</span>
+          <span className="mono-sub">{snap.battery.percent > 0 ? `${snap.battery.mAh} / ${Math.round(snap.battery.mAh / (snap.battery.percent / 100))} mAh` : '— mAh'}</span>
         </div>
         <div className="drone-info-row">
           <span className="mono-sub dim">{DRONE_NAME}</span>

@@ -3,10 +3,18 @@
 
 import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react'
 import { animate } from 'motion/react'
-import { bus, type DroneSnapshot } from './telemetry'
+import { bus, logBus, type DroneSnapshot, type LogEntry } from './telemetry'
 
 export function useTelemetry(): DroneSnapshot {
-  return useSyncExternalStore(bus.subscribe, bus.get)
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    return bus.subscribe(() => setTick(t => t + 1))
+  }, [])
+  return bus.get()
+}
+
+export function useTelemetryLog(): LogEntry[] {
+  return useSyncExternalStore(logBus.subscribe, logBus.get)
 }
 
 export function useBootNumber(live: number, dec = 0, duration = 0.9): string {
