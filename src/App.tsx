@@ -13,6 +13,10 @@ import { PointCloudViewer } from './components/widgets/PointCloudViewer'
 import { NavigationHUD } from './components/widgets/NavigationHUD'
 import { DroneModel } from './components/widgets/DroneModel'
 import { IMUCard } from './components/widgets/IMUCard'
+import { GpsCompassCard } from './components/widgets/GpsCompassCard'
+import { AltFlowCard } from './components/widgets/AltFlowCard'
+import { RcLinkCard } from './components/widgets/RcLinkCard'
+import { BaroCard } from './components/widgets/BaroCard'
 import { BatteryCard } from './components/widgets/BatteryCard'
 import { SignalCard } from './components/widgets/SignalCard'
 import { AttitudeIndicator } from './components/widgets/AttitudeIndicator'
@@ -94,8 +98,12 @@ export default function App() {
         {/* Right sidebar */}
         <div className="sidebar-area">
           <IMUCard index={4} />
-          <BatteryCard index={5} />
-          <SignalCard index={6} />
+          <GpsCompassCard index={5} />
+          <AltFlowCard index={6} />
+          <BaroCard index={7} />
+          <RcLinkCard index={8} />
+          <BatteryCard index={9} />
+          <SignalCard index={10} />
         </div>
 
         {/* Side bottom - attitude indicator */}
@@ -104,7 +112,7 @@ export default function App() {
         </div>
 
         {/* Bottom feed */}
-        <TelemetryFeed index={7} />
+        <TelemetryFeed index={11} />
       </main>
       <AnimatePresence>{paletteOpen && <CommandPalette />}</AnimatePresence>
     </CtlCtx.Provider>

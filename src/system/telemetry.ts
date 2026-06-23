@@ -12,6 +12,10 @@ import { BatteryStatus } from './mavlink/messages/battery-status'
 import { RadioStatus } from './mavlink/messages/radio-status'
 import { Statustext } from './mavlink/messages/statustext'
 import { GlobalPositionInt } from './mavlink/messages/global-position-int'
+import { RcChannels } from './mavlink/messages/rc-channels'
+import { DistanceSensor } from './mavlink/messages/distance-sensor'
+import { OpticalFlow } from './mavlink/messages/optical-flow'
+import { ScaledPressure } from './mavlink/messages/scaled-pressure'
 import { MAVLinkMessage } from './mavlink/node-mavlink-shim'
 
 export type ImuData = {
@@ -60,6 +64,33 @@ export type FlightData = {
   altitudeAGL: number
 }
 
+export type RcData = {
+  channels: number[] // µs per channel
+  linkQuality: number // 0..100 %
+  rssi: number // -dBm
+  frames: number // count of RC frames seen
+  lastUpdate: number
+}
+
+export type NavData = {
+  lidarHeight: number // m above ground (lidar)
+  lidarValid: boolean
+  flowVx: number // m/s, earth frame
+  flowVy: number
+  flowQuality: number // 0..255
+  flowValid: boolean
+  lastUpdate: number
+}
+
+export type BaroData = {
+  pressure: number // hPa
+  temperature: number // °C
+  altitude: number // m, ISA absolute
+  relAltitude: number // m, relative to ground reference captured at connect
+  valid: boolean
+  lastUpdate: number
+}
+
 export type DroneSnapshot = {
   timestamp: number
   bootAt: number
@@ -70,6 +101,9 @@ export type DroneSnapshot = {
   gps: GpsData
   radio: RadioData
   flight: FlightData
+  rc: RcData
+  nav: NavData
+  baro: BaroData
   fps: number
   frameMs: number
   pointCloudCount: number
@@ -103,6 +137,9 @@ let snap: DroneSnapshot = {
   gps: { lat: 0, lon: 0, alt: 0, satellites: 0, fix: 'NONE', hdop: 99.9 },
   radio: { rssi: 0, noise: 0, signalStrength: 0 },
   flight: { mode: 'UNKNOWN', armed: false, heading: 0, speed: 0, verticalSpeed: 0, altitudeAGL: 0 },
+  rc: { channels: [], linkQuality: 0, rssi: 0, frames: 0, lastUpdate: 0 },
+  nav: { lidarHeight: 0, lidarValid: false, flowVx: 0, flowVy: 0, flowQuality: 0, flowValid: false, lastUpdate: 0 },
+  baro: { pressure: 0, temperature: 0, altitude: 0, relAltitude: 0, valid: false, lastUpdate: 0 },
   fps: 60,
   frameMs: 16.7,
   pointCloudCount: 0,
@@ -123,6 +160,10 @@ let hasAttitudeMsg = false
 // Yaw synthesis integration (fallback when no ATTITUDE message)
 let fakeYaw = 0
 let lastImuTime = 0
+
+// Barometer ground reference (hPa), captured on the first valid reading so the
+// UI can show a launch-relative altitude that starts at zero.
+let baroGroundHpa = 0
 
 function notify() {
   for (const fn of listeners) fn()
@@ -365,6 +406,54 @@ setMavlinkHandler((msg: MAVLinkMessage) => {
     if (msg.hdg !== 0xFFFF) {
       snap.flight.heading = msg.hdg / 100 // cdeg to deg
     }
+    shouldNotify = true
+  }
+  else if (msg instanceof RcChannels) {
+    const raw = [
+      msg.chan1_raw, msg.chan2_raw, msg.chan3_raw, msg.chan4_raw,
+      msg.chan5_raw, msg.chan6_raw, msg.chan7_raw, msg.chan8_raw,
+      msg.chan9_raw, msg.chan10_raw, msg.chan11_raw, msg.chan12_raw,
+      msg.chan13_raw, msg.chan14_raw, msg.chan15_raw, msg.chan16_raw,
+    ]
+    const count = Math.min(msg.chancount || 16, 16)
+    snap.rc.channels = raw.slice(0, count).filter(v => v !== 0xFFFF)
+    // FC packs CRSF uplink link-quality (0..100 %) into the RSSI byte.
+    snap.rc.linkQuality = msg.rssi
+    snap.rc.rssi = msg.rssi
+    snap.rc.frames++
+    snap.rc.lastUpdate = now
+    shouldNotify = true
+  }
+  else if (msg instanceof DistanceSensor) {
+    // Downward lidar height (cm -> m). Drives the AGL indicator directly.
+    snap.nav.lidarHeight = msg.current_distance / 100
+    snap.nav.lidarValid =
+      msg.current_distance > msg.min_distance && msg.current_distance < msg.max_distance
+    snap.flight.altitudeAGL = snap.nav.lidarHeight
+    snap.nav.lastUpdate = now
+    shouldNotify = true
+  }
+  else if (msg instanceof OpticalFlow) {
+    snap.nav.flowVx = msg.flow_comp_m_x
+    snap.nav.flowVy = msg.flow_comp_m_y
+    snap.nav.flowQuality = msg.quality
+    snap.nav.flowValid = msg.quality > 0
+    if (msg.ground_distance > 0) snap.nav.lidarHeight = msg.ground_distance
+    snap.nav.lastUpdate = now
+    shouldNotify = true
+  }
+  else if (msg instanceof ScaledPressure) {
+    const hpa = msg.press_abs // already hPa
+    snap.baro.pressure = hpa
+    snap.baro.temperature = msg.temperature / 100 // centidegrees -> °C
+    // ISA barometric formula (hPa form).
+    snap.baro.altitude = 44330 * (1 - Math.pow(hpa / 1013.25, 0.190295))
+    if (baroGroundHpa === 0 && hpa > 300) baroGroundHpa = hpa
+    snap.baro.relAltitude = baroGroundHpa > 0
+      ? 44330 * (1 - Math.pow(hpa / baroGroundHpa, 0.190295))
+      : 0
+    snap.baro.valid = hpa > 300
+    snap.baro.lastUpdate = now
     shouldNotify = true
   }
   else if (msg instanceof RadioStatus) {
