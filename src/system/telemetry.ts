@@ -16,6 +16,7 @@ import { RcChannels } from './mavlink/messages/rc-channels'
 import { DistanceSensor } from './mavlink/messages/distance-sensor'
 import { OpticalFlow } from './mavlink/messages/optical-flow'
 import { ScaledPressure } from './mavlink/messages/scaled-pressure'
+import { LocalPositionNed } from './mavlink/messages/local-position-ned'
 import { MAVLinkMessage } from './mavlink/node-mavlink-shim'
 
 export type ImuData = {
@@ -91,6 +92,26 @@ export type BaroData = {
   lastUpdate: number
 }
 
+export type ProximityData = {
+  left: number // m, left side obstacle distance
+  leftValid: boolean
+  right: number // m, right side obstacle distance
+  rightValid: boolean
+  lastUpdate: number
+}
+
+export type EkfData = {
+  // Fused local position (m, NED) and velocity (m/s, NED) from the nav EKF.
+  x: number // north
+  y: number // east
+  z: number // down
+  vx: number
+  vy: number
+  vz: number
+  converged: boolean // true while LOCAL_POSITION_NED is arriving
+  lastUpdate: number
+}
+
 export type DroneSnapshot = {
   timestamp: number
   bootAt: number
@@ -104,6 +125,8 @@ export type DroneSnapshot = {
   rc: RcData
   nav: NavData
   baro: BaroData
+  proximity: ProximityData
+  ekf: EkfData
   fps: number
   frameMs: number
   pointCloudCount: number
@@ -140,6 +163,8 @@ let snap: DroneSnapshot = {
   rc: { channels: [], linkQuality: 0, rssi: 0, frames: 0, lastUpdate: 0 },
   nav: { lidarHeight: 0, lidarValid: false, flowVx: 0, flowVy: 0, flowQuality: 0, flowValid: false, lastUpdate: 0 },
   baro: { pressure: 0, temperature: 0, altitude: 0, relAltitude: 0, valid: false, lastUpdate: 0 },
+  proximity: { left: 0, leftValid: false, right: 0, rightValid: false, lastUpdate: 0 },
+  ekf: { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, converged: false, lastUpdate: 0 },
   fps: 60,
   frameMs: 16.7,
   pointCloudCount: 0,
@@ -425,12 +450,25 @@ setMavlinkHandler((msg: MAVLinkMessage) => {
     shouldNotify = true
   }
   else if (msg instanceof DistanceSensor) {
-    // Downward lidar height (cm -> m). Drives the AGL indicator directly.
-    snap.nav.lidarHeight = msg.current_distance / 100
-    snap.nav.lidarValid =
+    const meters = msg.current_distance / 100
+    const inRange =
       msg.current_distance > msg.min_distance && msg.current_distance < msg.max_distance
-    snap.flight.altitudeAGL = snap.nav.lidarHeight
-    snap.nav.lastUpdate = now
+    // Route by mounting orientation: 25 = down (AGL), 2 = right, 6 = left.
+    if (msg.orientation === 2) {
+      snap.proximity.right = meters
+      snap.proximity.rightValid = inRange
+      snap.proximity.lastUpdate = now
+    } else if (msg.orientation === 6) {
+      snap.proximity.left = meters
+      snap.proximity.leftValid = inRange
+      snap.proximity.lastUpdate = now
+    } else {
+      // Downward lidar height drives the AGL indicator.
+      snap.nav.lidarHeight = meters
+      snap.nav.lidarValid = inRange
+      snap.flight.altitudeAGL = meters
+      snap.nav.lastUpdate = now
+    }
     shouldNotify = true
   }
   else if (msg instanceof OpticalFlow) {
@@ -454,6 +492,18 @@ setMavlinkHandler((msg: MAVLinkMessage) => {
       : 0
     snap.baro.valid = hpa > 300
     snap.baro.lastUpdate = now
+    shouldNotify = true
+  }
+  else if (msg instanceof LocalPositionNed) {
+    // Fused EKF solution (only emitted once converged).
+    snap.ekf.x = msg.x
+    snap.ekf.y = msg.y
+    snap.ekf.z = msg.z
+    snap.ekf.vx = msg.vx
+    snap.ekf.vy = msg.vy
+    snap.ekf.vz = msg.vz
+    snap.ekf.converged = true
+    snap.ekf.lastUpdate = now
     shouldNotify = true
   }
   else if (msg instanceof RadioStatus) {

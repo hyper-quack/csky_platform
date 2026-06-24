@@ -14,9 +14,11 @@ import { NavigationHUD } from './components/widgets/NavigationHUD'
 import { DroneModel } from './components/widgets/DroneModel'
 import { IMUCard } from './components/widgets/IMUCard'
 import { GpsCompassCard } from './components/widgets/GpsCompassCard'
+import { NavEkfCard } from './components/widgets/NavEkfCard'
 import { AltFlowCard } from './components/widgets/AltFlowCard'
 import { RcLinkCard } from './components/widgets/RcLinkCard'
 import { BaroCard } from './components/widgets/BaroCard'
+import { ProximityCard } from './components/widgets/ProximityCard'
 import { BatteryCard } from './components/widgets/BatteryCard'
 import { SignalCard } from './components/widgets/SignalCard'
 import { AttitudeIndicator } from './components/widgets/AttitudeIndicator'
@@ -99,11 +101,13 @@ export default function App() {
         <div className="sidebar-area">
           <IMUCard index={4} />
           <GpsCompassCard index={5} />
-          <AltFlowCard index={6} />
-          <BaroCard index={7} />
-          <RcLinkCard index={8} />
-          <BatteryCard index={9} />
-          <SignalCard index={10} />
+          <NavEkfCard index={6} />
+          <AltFlowCard index={7} />
+          <ProximityCard index={8} />
+          <BaroCard index={9} />
+          <RcLinkCard index={10} />
+          <BatteryCard index={11} />
+          <SignalCard index={12} />
         </div>
 
         {/* Side bottom - attitude indicator */}
@@ -112,7 +116,7 @@ export default function App() {
         </div>
 
         {/* Bottom feed */}
-        <TelemetryFeed index={11} />
+        <TelemetryFeed index={13} />
       </main>
       <AnimatePresence>{paletteOpen && <CommandPalette />}</AnimatePresence>
     </CtlCtx.Provider>
