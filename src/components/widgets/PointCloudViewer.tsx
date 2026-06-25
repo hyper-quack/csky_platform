@@ -103,10 +103,16 @@ function GridHelper() {
   )
 }
 
-export function PointCloudViewer() {
+export function PointCloudViewer({ onOpenEsc }: { onOpenEsc?: () => void }) {
   return (
     <div className="point-cloud-viewer" id="point-cloud-viewer">
       <div className="pcv-sidebar">
+        <button className="pcv-icon" aria-label="esc-config" title="ESC / Motors" onClick={onOpenEsc}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" />
+          </svg>
+        </button>
         <button className="pcv-icon" aria-label="fullscreen">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" />

@@ -1,5 +1,7 @@
 import {MAVLinkMessage} from './node-mavlink-shim';
 import {SckyImuStatus} from './messages/scky-imu-status';
+import {SckyEscTelem} from './messages/scky-esc-telem';
+import {SckyEscConfig} from './messages/scky-esc-config';
 import {SysStatus} from './messages/sys-status';
 import {SystemTime} from './messages/system-time';
 import {Ping} from './messages/ping';
@@ -236,6 +238,8 @@ import {AutopilotVersion} from './messages/autopilot-version';
 import {Heartbeat} from './messages/heartbeat';
 export const messageRegistry: Array<[number, new (system_id: number, component_id: number) => MAVLinkMessage]> = [
 	[42000, SckyImuStatus],
+	[42010, SckyEscTelem],
+	[42011, SckyEscConfig],
 	[1, SysStatus],
 	[2, SystemTime],
 	[4, Ping],

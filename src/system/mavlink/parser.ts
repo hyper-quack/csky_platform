@@ -122,11 +122,18 @@ export class MavlinkStreamParser {
           offset += 8; 
         }
         else if (type.includes('[')) {
+          const base = type.split('[')[0];
           const num = parseInt(type.split('[')[1]);
           val = [];
           for (let i=0; i<num; i++) {
             if (offset >= payload.byteLength) break;
-            val.push(view.getUint8(offset++));
+            if (base === 'int8_t') { val.push(view.getInt8(offset)); offset += 1; }
+            else if (base === 'uint16_t') { val.push(view.getUint16(offset, true)); offset += 2; }
+            else if (base === 'int16_t') { val.push(view.getInt16(offset, true)); offset += 2; }
+            else if (base === 'uint32_t') { val.push(view.getUint32(offset, true)); offset += 4; }
+            else if (base === 'int32_t') { val.push(view.getInt32(offset, true)); offset += 4; }
+            else if (base === 'float') { val.push(view.getFloat32(offset, true)); offset += 4; }
+            else { val.push(view.getUint8(offset)); offset += 1; } // uint8_t / char
           }
         }
         

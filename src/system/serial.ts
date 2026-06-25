@@ -89,6 +89,25 @@ export function isSerialConnected() {
   return isConnected
 }
 
+// Uplink: write a pre-framed MAVLink packet to the FC. Writes are serialized
+// through a single chain so overlapping callers never collide on getWriter()
+// ("WritableStream is locked"). Silently no-ops when disconnected.
+let writeChain: Promise<void> = Promise.resolve()
+export function writeMavlink(frame: Uint8Array): Promise<void> {
+  writeChain = writeChain.then(async () => {
+    if (!port || !isConnected || !port.writable) return
+    const writer = port.writable.getWriter()
+    try {
+      await writer.write(frame)
+    } catch (err) {
+      console.error('writeMavlink failed:', err)
+    } finally {
+      writer.releaseLock()
+    }
+  })
+  return writeChain
+}
+
 // Cleanly disconnect
 export async function disconnectSerial() {
   isConnected = false

@@ -1,6 +1,12 @@
 // CSKY Platform — Drone Telemetry Bus
 
-import { setMavlinkHandler } from './serial'
+import { setMavlinkHandler, writeMavlink } from './serial'
+import { encodeMavlink2 } from './mavlink/encoder'
+import { SckyEscTelem } from './mavlink/messages/scky-esc-telem'
+import { SckyEscConfig } from './mavlink/messages/scky-esc-config'
+import { SckyEscSet } from './mavlink/messages/scky-esc-set'
+import { SckyEscCmd } from './mavlink/messages/scky-esc-cmd'
+import { CommandLong } from './mavlink/messages/command-long'
 import { Heartbeat } from './mavlink/messages/heartbeat'
 import { SysStatus } from './mavlink/messages/sys-status'
 import { HighresImu } from './mavlink/messages/highres-imu'
@@ -17,6 +23,7 @@ import { DistanceSensor } from './mavlink/messages/distance-sensor'
 import { OpticalFlow } from './mavlink/messages/optical-flow'
 import { ScaledPressure } from './mavlink/messages/scaled-pressure'
 import { LocalPositionNed } from './mavlink/messages/local-position-ned'
+import { NamedValueInt } from './mavlink/messages/named-value-int'
 import { MAVLinkMessage } from './mavlink/node-mavlink-shim'
 
 export type ImuData = {
@@ -112,6 +119,38 @@ export type EkfData = {
   lastUpdate: number
 }
 
+export type EscMotor = {
+  rpm: number
+  voltage: number // V
+  current: number // A
+  temp: number // °C
+  error: number // desync / error count
+}
+
+export type EscConfigData = {
+  masterEnabled: boolean
+  protocol: number // 0=DSHOT150, 1=DSHOT300, 2=DSHOT600
+  refreshHz: number
+  bidir: boolean
+  dirMask: number // bit per motor: 1 = reversed
+  mode3dMask: number // bit per motor: 1 = 3D on
+  poleCount: number
+  curScale: number
+  curOffset: number
+}
+
+export type EscData = {
+  motors: EscMotor[] // length 4
+  mah: number // consumed
+  totalCurrent: number // A, aggregate
+  config: EscConfigData
+  lastTelem: number
+  lastConfig: number
+  // Session peaks for the health panel.
+  peakCurrent: number
+  peakTemp: number
+}
+
 export type DroneSnapshot = {
   timestamp: number
   bootAt: number
@@ -127,6 +166,7 @@ export type DroneSnapshot = {
   baro: BaroData
   proximity: ProximityData
   ekf: EkfData
+  esc: EscData
   fps: number
   frameMs: number
   pointCloudCount: number
@@ -165,6 +205,26 @@ let snap: DroneSnapshot = {
   baro: { pressure: 0, temperature: 0, altitude: 0, relAltitude: 0, valid: false, lastUpdate: 0 },
   proximity: { left: 0, leftValid: false, right: 0, rightValid: false, lastUpdate: 0 },
   ekf: { x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0, converged: false, lastUpdate: 0 },
+  esc: {
+    motors: Array.from({ length: 4 }, () => ({ rpm: 0, voltage: 0, current: 0, temp: 0, error: 0 })),
+    mah: 0,
+    totalCurrent: 0,
+    config: {
+      masterEnabled: false,
+      protocol: 0,
+      refreshHz: 1000,
+      bidir: false,
+      dirMask: 0,
+      mode3dMask: 0,
+      poleCount: 14,
+      curScale: 490,
+      curOffset: 0,
+    },
+    lastTelem: 0,
+    lastConfig: 0,
+    peakCurrent: 0,
+    peakTemp: 0,
+  },
   fps: 60,
   frameMs: 16.7,
   pointCloudCount: 0,
@@ -286,6 +346,12 @@ function periodicTelemetryLog() {
   pushLog(
     `NAV: mode=${s.flight.mode} armed=${s.flight.armed} spd=${s.flight.speed.toFixed(1)}m/s vspd=${formatSign(s.flight.verticalSpeed, 1)}m/s alt=${s.flight.altitudeAGL.toFixed(0)}m`
   )
+
+  // Proximity / side lidar line — always log so the user can diagnose the sensor
+  const liveProx = Date.now() - s.proximity.lastUpdate < 2000
+  const lStr = s.proximity.leftValid ? `${s.proximity.left.toFixed(2)}m` : (liveProx ? 'MAX' : 'NO DATA')
+  const rStr = s.proximity.rightValid ? `${s.proximity.right.toFixed(2)}m` : (liveProx ? 'MAX' : 'NO DATA')
+  pushLog(`PROX: L=${lStr} R=${rStr}${liveProx ? '' : ' (no DISTANCE_SENSOR msgs)'}`)
 }
 
 let logPaused = false
@@ -452,7 +518,7 @@ setMavlinkHandler((msg: MAVLinkMessage) => {
   else if (msg instanceof DistanceSensor) {
     const meters = msg.current_distance / 100
     const inRange =
-      msg.current_distance > msg.min_distance && msg.current_distance < msg.max_distance
+      msg.current_distance > msg.min_distance && msg.current_distance <= msg.max_distance
     // Route by mounting orientation: 25 = down (AGL), 2 = right, 6 = left.
     if (msg.orientation === 2) {
       snap.proximity.right = meters
@@ -576,6 +642,52 @@ setMavlinkHandler((msg: MAVLinkMessage) => {
       shouldNotify = true
     }
   }
+  else if (msg instanceof NamedValueInt) {
+    // T6_* diagnostics from the TF-Luna lidar on USART6 — log at 1 Hz.
+    const name: string = typeof msg.name === 'string'
+      ? msg.name
+      : String.fromCharCode(...(msg.name as unknown as number[]).filter((c: number) => c > 0))
+    if (name.startsWith('T6_')) {
+      pushLog(`[LIDAR] ${name}=${msg.value}`)
+    }
+    shouldNotify = true
+  }
+  else if (msg instanceof SckyEscTelem) {
+    const rpm = (msg.rpm as number[]) ?? []
+    const cv = (msg.centivolt as number[]) ?? []
+    const ca = (msg.centiamp as number[]) ?? []
+    const tp = (msg.temperature as number[]) ?? []
+    const er = (msg.error_count as number[]) ?? []
+    for (let i = 0; i < 4; i++) {
+      const m = snap.esc.motors[i]
+      m.rpm = rpm[i] ?? 0
+      m.voltage = (cv[i] ?? 0) / 100
+      m.current = (ca[i] ?? 0) / 100
+      m.temp = tp[i] ?? 0
+      m.error = er[i] ?? 0
+      if (m.current > snap.esc.peakCurrent) snap.esc.peakCurrent = m.current
+      if (m.temp > snap.esc.peakTemp) snap.esc.peakTemp = m.temp
+    }
+    snap.esc.mah = msg.mah_consumed
+    snap.esc.totalCurrent = msg.analog_current
+    snap.esc.lastTelem = now
+    shouldNotify = true
+  }
+  else if (msg instanceof SckyEscConfig) {
+    snap.esc.config = {
+      masterEnabled: !!msg.master_enabled,
+      protocol: msg.protocol,
+      refreshHz: msg.refresh_hz,
+      bidir: !!msg.bidir,
+      dirMask: msg.dir_mask,
+      mode3dMask: msg.mode3d_mask,
+      poleCount: msg.pole_count,
+      curScale: msg.cur_scale,
+      curOffset: msg.cur_offset,
+    }
+    snap.esc.lastConfig = now
+    shouldNotify = true
+  }
   else if (msg instanceof Statustext) {
     // Forward FC status text messages to our log feed
     const sevLabels = ['EMERGENCY', 'ALERT', 'CRITICAL', 'ERROR', 'WARNING', 'NOTICE', 'INFO', 'DEBUG']
@@ -657,6 +769,56 @@ export const bus = {
     autoSweep = v
     startSweep()
     if (v) emit('sync')
+  },
+  /** Write the ESC configuration. `patch` overrides fields of the current config. */
+  escSetConfig(patch: Partial<EscConfigData>) {
+    const c = { ...snap.esc.config, ...patch }
+    const m = new SckyEscSet()
+    m.cur_scale = c.curScale
+    m.cur_offset = c.curOffset
+    m.refresh_hz = c.refreshHz
+    m.protocol = c.protocol
+    m.master_enabled = c.masterEnabled ? 1 : 0
+    m.bidir = c.bidir ? 1 : 0
+    m.dir_mask = c.dirMask
+    m.pole_count = c.poleCount
+    m.mode3d_mask = c.mode3dMask
+    // Optimistic local update so the UI reflects intent immediately; the FC's
+    // SCKY_ESC_CONFIG echo confirms (or corrects) it within ~1 s.
+    snap.esc.config = c
+    notify()
+    void writeMavlink(encodeMavlink2(m))
+  },
+  /** Spin one motor (1-based) at `throttlePct` (0..100) for `timeoutS` seconds. */
+  escMotorTest(motor: number, throttlePct: number, timeoutS = 2) {
+    const m = new CommandLong()
+    m.target_system = 1
+    m.target_component = 1
+    m.command = 209 // MAV_CMD_DO_MOTOR_TEST
+    m.confirmation = 0
+    m.param1 = motor // motor instance (1-based)
+    m.param2 = 0 // throttle type: percent
+    m.param3 = throttlePct
+    m.param4 = timeoutS
+    m.param5 = 0 // motor count
+    m.param6 = 0
+    m.param7 = 0
+    void writeMavlink(encodeMavlink2(m))
+  },
+  /** Stop all motors immediately (motor test at 0% with no timeout window). */
+  escStopAll() {
+    this.escMotorTest(1, 0, 0)
+    this.escMotorTest(2, 0, 0)
+    this.escMotorTest(3, 0, 0)
+    this.escMotorTest(4, 0, 0)
+  },
+  /** Send a DShot special command. `target` 0=all, 1..4 = a motor. */
+  escCommand(target: number, command: number) {
+    const m = new SckyEscCmd()
+    m.value = 0
+    m.target = target
+    m.command = command
+    void writeMavlink(encodeMavlink2(m))
   },
   start() {
     if (running) return

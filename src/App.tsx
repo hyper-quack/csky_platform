@@ -10,6 +10,7 @@ import { CameraCard } from './components/widgets/CameraCard'
 import { CoverageCard } from './components/widgets/CoverageCard'
 import { RecordingsCard } from './components/widgets/RecordingsCard'
 import { PointCloudViewer } from './components/widgets/PointCloudViewer'
+import { EscConfigView } from './components/widgets/EscConfigView'
 import { NavigationHUD } from './components/widgets/NavigationHUD'
 import { DroneModel } from './components/widgets/DroneModel'
 import { IMUCard } from './components/widgets/IMUCard'
@@ -34,6 +35,7 @@ export default function App() {
   const [soundOn, setSoundOn] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [connected, setConnected] = useState(false)
+  const [viewportMode, setViewportMode] = useState<'cloud' | 'esc'>('cloud')
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -91,10 +93,16 @@ export default function App() {
           <DroneModel />
         </div>
 
-        {/* Main viewport */}
+        {/* Main viewport — point cloud or ESC/motor configuration */}
         <div className="viewport-area">
-          <PointCloudViewer />
-          <NavigationHUD />
+          {viewportMode === 'cloud' ? (
+            <>
+              <PointCloudViewer onOpenEsc={() => setViewportMode('esc')} />
+              <NavigationHUD />
+            </>
+          ) : (
+            <EscConfigView onClose={() => setViewportMode('cloud')} />
+          )}
         </div>
 
         {/* Right sidebar */}
