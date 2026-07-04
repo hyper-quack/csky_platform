@@ -303,6 +303,11 @@ canvas{display:block;width:100%;height:100%}
 .batt-main{display:flex;gap:16px;align-items:flex-start;margin-top:6px}
 .batt-details{display:flex;flex-direction:column;gap:3px;flex:1}
 .batt-row{display:flex;justify-content:space-between;gap:8px}
+.batt-cfg-btn{background:transparent;border:1px solid var(--border);color:var(--text-secondary);font:400 10px 'Space Mono',monospace;padding:2px 8px;cursor:pointer;text-transform:uppercase}
+.batt-cfg-btn:hover{color:var(--text-primary);border-color:var(--border-visible)}
+.batt-cfg{display:flex;flex-direction:column;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)}
+.batt-cfg-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.batt-cfg-row select,.batt-cfg-row input{background:var(--surface);border:1px solid var(--border);color:var(--text-primary);padding:3px 6px;font:400 11px 'Space Grotesk',sans-serif;width:96px}
 
 /* ── Signal Card ── */
 .signal-card{border-bottom:1px solid var(--border)}
@@ -428,7 +433,8 @@ canvas{display:block;width:100%;height:100%}
 .esc-motor-vals .err:not(:empty){color:var(--text-primary)}
 .esc-motor-test{display:flex;align-items:center;gap:8px}
 .esc-motor-test input[type=range]{flex:1;accent-color:var(--accent)}
-.esc-thr{font:400 11px/1 'Space Mono',monospace;color:var(--text-secondary);min-width:34px;text-align:right}
+.esc-thr{font:400 11px/1.3 'Space Mono',monospace;color:var(--text-secondary);min-width:48px;text-align:right}
+.esc-thr small{display:block;opacity:.65;font-size:9px}
 .esc-dir{display:flex;gap:4px}
 .esc-dir button,.esc-actions button,.esc-beacons button,.esc-apply,.esc-stop{
   font:500 10px/1 'Space Mono',monospace;letter-spacing:.06em;padding:6px 10px;
@@ -447,4 +453,7 @@ canvas{display:block;width:100%;height:100%}
 .esc-apply{background:var(--accent);color:#000;border-color:var(--accent)}
 .esc-apply:hover{filter:brightness(1.1)}
 .esc-beacons{display:flex;align-items:center;gap:6px;font:400 10px 'Space Mono',monospace;color:var(--text-secondary)}
+.esc-map{display:flex;flex-direction:column;gap:3px;font:400 9px/1.2 'Space Mono',monospace;color:var(--text-secondary);text-transform:uppercase}
+.esc-map select,.esc-map input{background:var(--surface);border:1px solid var(--border);color:var(--text-primary);padding:4px 6px;font:400 11px 'Space Grotesk',sans-serif;width:100%}
+.esc-hint{font:400 10px/1.4 'Space Mono',monospace;color:var(--text-secondary);margin:6px 0 0}
 @media(max-width:900px){.esc-grid{grid-template-columns:1fr}.esc-panel.esc-span{grid-column:1}.esc-form{grid-template-columns:1fr 1fr}}

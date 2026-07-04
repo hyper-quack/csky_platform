@@ -1,6 +1,6 @@
 import {MAVLinkMessage} from '../node-mavlink-shim';
 /*
-// One-shot DShot special command (ground station -> FC). crc_extra=106.
+// One-shot ESC action (ground station -> FC). command: 1=start range-cal, 2=stop cal, 3=stop all. crc_extra=106.
 */
 export class SckyEscCmd extends MAVLinkMessage {
 	public value!: number;

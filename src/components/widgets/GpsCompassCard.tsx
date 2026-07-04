@@ -91,6 +91,9 @@ export function GpsCompassCard({ index }: { index: number }) {
 
   const fixClass = gps.fix === '3D' ? 'ok' : gps.fix === '2D' ? 'unknown' : 'fail'
   const hasFix = gps.fix !== 'NONE'
+  const compass = snap.compass
+  const compassClass = !compass.present ? 'fail' : compass.healthy ? 'ok' : 'unknown'
+  const compassLabel = !compass.present ? 'NONE' : compass.healthy ? 'OK' : 'NO DATA'
 
   return (
     <Card index={index} label="GPS · COMPASS" tag="LIVE" className="gps-card">
@@ -114,6 +117,13 @@ export function GpsCompassCard({ index }: { index: number }) {
             <span className="mono-sub dim">SATS</span>
             <span className="doto-sm" style={{ fontSize: 18 }}>
               {gps.satellites}
+            </span>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="mono-sub dim">MAG</span>
+            <span className={`imu-health ${compassClass}`}>
+              <span className={`led ${compass.present ? '' : 'red'}`} style={{ width: 6, height: 6 }} />
+              {compassLabel}
             </span>
           </div>
         </div>

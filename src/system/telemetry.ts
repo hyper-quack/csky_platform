@@ -44,8 +44,11 @@ export type BatteryData = {
   current: number
   mAh: number
   percent: number
-  cells: number
+  cells: number // effective cell count (configured, or auto-detected from voltage)
   temperature: number
+  // User pack config (persisted): cellsConfig 0 = auto-detect, else fixed count.
+  cellsConfig: number
+  capacity: number // rated pack capacity, mAh
 }
 
 export type GpsData = {
@@ -55,6 +58,12 @@ export type GpsData = {
   satellites: number
   fix: '3D' | '2D' | 'NONE'
   hdop: number
+  receiving: boolean // FC is getting NMEA (SYS_STATUS GPS-present bit)
+}
+
+export type CompassData = {
+  present: boolean // a magnetometer chip was detected
+  healthy: boolean // it is returning readings
 }
 
 export type RadioData = {
@@ -129,12 +138,10 @@ export type EscMotor = {
 
 export type EscConfigData = {
   masterEnabled: boolean
-  protocol: number // 0=DSHOT150, 1=DSHOT300, 2=DSHOT600
-  refreshHz: number
-  bidir: boolean
-  dirMask: number // bit per motor: 1 = reversed
-  mode3dMask: number // bit per motor: 1 = 3D on
-  poleCount: number
+  pwmHz: number // PWM carrier frequency (applied at FC boot)
+  minUs: number[] // per-motor min throttle pulse (idle), µs — length 4
+  maxUs: number[] // per-motor max throttle pulse (full), µs — length 4
+  outputMap: number[] // logical motor i -> physical output outputMap[i] (0..3) — length 4
   curScale: number
   curOffset: number
 }
@@ -159,6 +166,7 @@ export type DroneSnapshot = {
   imu2: ImuData
   battery: BatteryData
   gps: GpsData
+  compass: CompassData
   radio: RadioData
   flight: FlightData
   rc: RcData
@@ -175,6 +183,33 @@ export type DroneSnapshot = {
 type Drawer = (t: number, dt: number) => void
 
 const bootAt = Date.now()
+
+// Voltage-based state-of-charge (matches the FC's Betaflight-style thresholds).
+const CELL_FULL_V = 4.2
+const CELL_EMPTY_V = 3.3
+const CELL_DETECT_V = 4.3
+function detectCells(v: number): number {
+  return v < 1 ? 0 : Math.min(12, Math.max(1, Math.floor(v / CELL_DETECT_V) + 1))
+}
+function socPercent(v: number, cells: number): number {
+  if (!cells) return 0
+  const per = v / cells
+  return Math.max(0, Math.min(100, Math.round(((per - CELL_EMPTY_V) / (CELL_FULL_V - CELL_EMPTY_V)) * 100)))
+}
+
+// Persisted battery pack config (cell-count override + rated capacity).
+const BATT_CFG_KEY = 'csky.batteryConfig'
+function loadBatteryConfig(): { cellsConfig: number; capacity: number } {
+  try {
+    const raw = localStorage.getItem(BATT_CFG_KEY)
+    if (raw) {
+      const c = JSON.parse(raw)
+      return { cellsConfig: Number(c.cellsConfig) || 0, capacity: Number(c.capacity) || 0 }
+    }
+  } catch { /* ignore */ }
+  return { cellsConfig: 0, capacity: 0 } // 0 cells = auto-detect
+}
+const initialBattCfg = loadBatteryConfig()
 
 function initImu(): ImuData {
   return {
@@ -196,8 +231,13 @@ let snap: DroneSnapshot = {
   uptime: 0,
   imu1: initImu(),
   imu2: initImu(),
-  battery: { voltage: 0, current: 0, mAh: 0, percent: 0, cells: 6, temperature: 0 },
-  gps: { lat: 0, lon: 0, alt: 0, satellites: 0, fix: 'NONE', hdop: 99.9 },
+  battery: {
+    voltage: 0, current: 0, mAh: 0, percent: 0,
+    cells: initialBattCfg.cellsConfig || 6, temperature: 0,
+    cellsConfig: initialBattCfg.cellsConfig, capacity: initialBattCfg.capacity,
+  },
+  gps: { lat: 0, lon: 0, alt: 0, satellites: 0, fix: 'NONE', hdop: 99.9, receiving: false },
+  compass: { present: false, healthy: false },
   radio: { rssi: 0, noise: 0, signalStrength: 0 },
   flight: { mode: 'UNKNOWN', armed: false, heading: 0, speed: 0, verticalSpeed: 0, altitudeAGL: 0 },
   rc: { channels: [], linkQuality: 0, rssi: 0, frames: 0, lastUpdate: 0 },
@@ -211,12 +251,10 @@ let snap: DroneSnapshot = {
     totalCurrent: 0,
     config: {
       masterEnabled: false,
-      protocol: 0,
-      refreshHz: 1000,
-      bidir: false,
-      dirMask: 0,
-      mode3dMask: 0,
-      poleCount: 14,
+      pwmHz: 50,
+      minUs: [1000, 1000, 1000, 1000],
+      maxUs: [2000, 2000, 2000, 2000],
+      outputMap: [0, 1, 2, 3],
       curScale: 490,
       curOffset: 0,
     },
@@ -328,10 +366,30 @@ function periodicTelemetryLog() {
     )
   }
 
-  // GPS line
+  // GPS line — always logged so a wired-but-unlocked GPS is visible (indoors the
+  // fix stays NONE even when the receiver is working; sats climbing = it's alive).
   if (s.gps.fix !== 'NONE') {
     pushLog(
       `GPS: lat=${s.gps.lat.toFixed(7)} lon=${s.gps.lon.toFixed(7)} alt=${s.gps.alt.toFixed(1)}m sats=${s.gps.satellites} fix=${s.gps.fix} hdop=${s.gps.hdop.toFixed(1)}`
+    )
+  } else {
+    const gpsState = s.gps.receiving ? 'receiving, no lock — needs open sky' : 'NO DATA (check wiring/receiver)'
+    pushLog(`GPS: fix=NONE sats=${s.gps.satellites} (${gpsState})`)
+  }
+
+  // Compass line — so mag presence/health is visible in the platform.
+  pushLog(
+    s.compass.present
+      ? `COMPASS: detected, ${s.compass.healthy ? 'healthy' : 'no data'} | hdg=${s.flight.heading.toFixed(0)}°`
+      : `COMPASS: not detected (check SDA=PB11/SCL=PB10 + power)`
+  )
+
+  // Battery line (voltage-based; shows once a pack is present)
+  if (s.battery.voltage > 0) {
+    const perCell = s.battery.cells > 0 ? s.battery.voltage / s.battery.cells : 0
+    const cap = s.battery.capacity > 0 ? ` cap=${s.battery.capacity}mAh` : ''
+    pushLog(
+      `BATT: ${s.battery.voltage.toFixed(2)}V ${s.battery.cells}S (${perCell.toFixed(2)}V/cell) ${Math.round(s.battery.percent)}%${cap}`
     )
   }
 
@@ -439,16 +497,25 @@ setMavlinkHandler((msg: MAVLinkMessage) => {
     shouldNotify = true
   }
   else if (msg instanceof SysStatus) {
-    // SysStatus provides battery as a fallback (lower resolution than BATTERY_STATUS)
+    // Battery: voltage from the FC, cell count + % applied from the user's pack
+    // config (fixed cellsConfig, else auto-detect). The FC's own % is ignored so
+    // a forced 3S/4S/6S selection drives the displayed charge correctly.
     if (msg.voltage_battery !== 0xFFFF && msg.voltage_battery > 0) {
-      snap.battery.voltage = msg.voltage_battery / 1000 // mV to V
+      const v = msg.voltage_battery / 1000 // mV to V
+      snap.battery.voltage = v
+      const cells = snap.battery.cellsConfig > 0 ? snap.battery.cellsConfig : detectCells(v)
+      snap.battery.cells = cells
+      snap.battery.percent = socPercent(v, cells)
     }
     if (msg.current_battery >= 0) {
       snap.battery.current = msg.current_battery / 100 // cA to A
     }
-    if (msg.battery_remaining >= 0) {
-      snap.battery.percent = msg.battery_remaining
-    }
+    // Sensor health bitmap: MAG = 1<<2, GPS = 1<<5 (present + healthy tracked).
+    const present = Number(msg.onboard_control_sensors_present) || 0
+    const health = Number(msg.onboard_control_sensors_health) || 0
+    snap.compass.present = (present & (1 << 2)) !== 0
+    snap.compass.healthy = (health & (1 << 2)) !== 0
+    snap.gps.receiving = (present & (1 << 5)) !== 0
     shouldNotify = true
   }
   else if (msg instanceof BatteryStatus) {
@@ -676,12 +743,10 @@ setMavlinkHandler((msg: MAVLinkMessage) => {
   else if (msg instanceof SckyEscConfig) {
     snap.esc.config = {
       masterEnabled: !!msg.master_enabled,
-      protocol: msg.protocol,
-      refreshHz: msg.refresh_hz,
-      bidir: !!msg.bidir,
-      dirMask: msg.dir_mask,
-      mode3dMask: msg.mode3d_mask,
-      poleCount: msg.pole_count,
+      pwmHz: msg.pwm_hz,
+      minUs: [...(msg.min_us as number[])],
+      maxUs: [...(msg.max_us as number[])],
+      outputMap: [...(msg.output_map as number[])],
       curScale: msg.cur_scale,
       curOffset: msg.cur_offset,
     }
@@ -776,13 +841,11 @@ export const bus = {
     const m = new SckyEscSet()
     m.cur_scale = c.curScale
     m.cur_offset = c.curOffset
-    m.refresh_hz = c.refreshHz
-    m.protocol = c.protocol
+    m.min_us = [...c.minUs]
+    m.max_us = [...c.maxUs]
+    m.pwm_hz = c.pwmHz
+    m.output_map = [...c.outputMap]
     m.master_enabled = c.masterEnabled ? 1 : 0
-    m.bidir = c.bidir ? 1 : 0
-    m.dir_mask = c.dirMask
-    m.pole_count = c.poleCount
-    m.mode3d_mask = c.mode3dMask
     // Optimistic local update so the UI reflects intent immediately; the FC's
     // SCKY_ESC_CONFIG echo confirms (or corrects) it within ~1 s.
     snap.esc.config = c
@@ -812,13 +875,29 @@ export const bus = {
     this.escMotorTest(3, 0, 0)
     this.escMotorTest(4, 0, 0)
   },
-  /** Send a DShot special command. `target` 0=all, 1..4 = a motor. */
+  /** Send an ESC action. `command`: 1=cal hold MAX, 2=cal hold MIN, 3=stop all. */
   escCommand(target: number, command: number) {
     const m = new SckyEscCmd()
     m.value = 0
     m.target = target
     m.command = command
     void writeMavlink(encodeMavlink2(m))
+  },
+  /** Set battery pack config (cellsConfig 0 = auto, else fixed count; capacity mAh).
+   *  Persisted locally and applied to the charge estimate immediately. */
+  setBatteryConfig(patch: { cellsConfig?: number; capacity?: number }) {
+    if (patch.cellsConfig !== undefined) snap.battery.cellsConfig = patch.cellsConfig
+    if (patch.capacity !== undefined) snap.battery.capacity = patch.capacity
+    // Re-apply the estimate with the new cell count against the latest voltage.
+    const cells = snap.battery.cellsConfig > 0 ? snap.battery.cellsConfig : detectCells(snap.battery.voltage)
+    snap.battery.cells = cells || snap.battery.cells
+    if (snap.battery.voltage > 0) snap.battery.percent = socPercent(snap.battery.voltage, cells)
+    try {
+      localStorage.setItem(BATT_CFG_KEY, JSON.stringify({
+        cellsConfig: snap.battery.cellsConfig, capacity: snap.battery.capacity,
+      }))
+    } catch { /* ignore */ }
+    notify()
   },
   start() {
     if (running) return
