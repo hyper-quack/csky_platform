@@ -40,7 +40,8 @@ export type ImuData = {
 }
 
 export type BatteryData = {
-  voltage: number
+  voltage: number // calibrated pack voltage shown to the user (voltageRaw × vbatCal)
+  voltageRaw: number // as reported by the FC (before the app-side calibration)
   current: number
   mAh: number
   percent: number
@@ -49,6 +50,7 @@ export type BatteryData = {
   // User pack config (persisted): cellsConfig 0 = auto-detect, else fixed count.
   cellsConfig: number
   capacity: number // rated pack capacity, mAh
+  vbatCal: number // voltage calibration multiplier (Betaflight-style; default 1.0)
 }
 
 export type GpsData = {
@@ -198,16 +200,22 @@ function socPercent(v: number, cells: number): number {
 }
 
 // Persisted battery pack config (cell-count override + rated capacity).
-const BATT_CFG_KEY = 'csky.batteryConfig'
-function loadBatteryConfig(): { cellsConfig: number; capacity: number } {
+// v2: firmware VBAT scale corrected to ~20:1, so any calibration saved against the
+// old 11:1 scale is stale — a new key resets vbatCal to 1.0.
+const BATT_CFG_KEY = 'csky.batteryConfig.v2'
+function loadBatteryConfig(): { cellsConfig: number; capacity: number; vbatCal: number } {
   try {
     const raw = localStorage.getItem(BATT_CFG_KEY)
     if (raw) {
       const c = JSON.parse(raw)
-      return { cellsConfig: Number(c.cellsConfig) || 0, capacity: Number(c.capacity) || 0 }
+      return {
+        cellsConfig: Number(c.cellsConfig) || 0,
+        capacity: Number(c.capacity) || 0,
+        vbatCal: Number(c.vbatCal) > 0 ? Number(c.vbatCal) : 1,
+      }
     }
   } catch { /* ignore */ }
-  return { cellsConfig: 0, capacity: 0 } // 0 cells = auto-detect
+  return { cellsConfig: 0, capacity: 0, vbatCal: 1 } // 0 cells = auto-detect
 }
 const initialBattCfg = loadBatteryConfig()
 
@@ -232,9 +240,10 @@ let snap: DroneSnapshot = {
   imu1: initImu(),
   imu2: initImu(),
   battery: {
-    voltage: 0, current: 0, mAh: 0, percent: 0,
+    voltage: 0, voltageRaw: 0, current: 0, mAh: 0, percent: 0,
     cells: initialBattCfg.cellsConfig || 6, temperature: 0,
     cellsConfig: initialBattCfg.cellsConfig, capacity: initialBattCfg.capacity,
+    vbatCal: initialBattCfg.vbatCal,
   },
   gps: { lat: 0, lon: 0, alt: 0, satellites: 0, fix: 'NONE', hdop: 99.9, receiving: false },
   compass: { present: false, healthy: false },
@@ -501,7 +510,9 @@ setMavlinkHandler((msg: MAVLinkMessage) => {
     // config (fixed cellsConfig, else auto-detect). The FC's own % is ignored so
     // a forced 3S/4S/6S selection drives the displayed charge correctly.
     if (msg.voltage_battery !== 0xFFFF && msg.voltage_battery > 0) {
-      const v = msg.voltage_battery / 1000 // mV to V
+      const raw = msg.voltage_battery / 1000 // mV to V, as reported by the FC
+      snap.battery.voltageRaw = raw
+      const v = raw * snap.battery.vbatCal // app-side calibration (match a multimeter)
       snap.battery.voltage = v
       const cells = snap.battery.cellsConfig > 0 ? snap.battery.cellsConfig : detectCells(v)
       snap.battery.cells = cells
@@ -875,6 +886,25 @@ export const bus = {
     this.escMotorTest(3, 0, 0)
     this.escMotorTest(4, 0, 0)
   },
+  /** Reboot the FC into the ROM (DFU) bootloader so new firmware can be flashed
+   *  over USB without touching BOOT0. Sends MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN with
+   *  param1=3 (reboot to bootloader). The FC acks, then resets — the CDC serial
+   *  port drops and a DFU device appears. */
+  rebootToBootloader() {
+    const m = new CommandLong()
+    m.target_system = 1
+    m.target_component = 1
+    m.command = 246 // MAV_CMD_PREFLIGHT_REBOOT_SHUTDOWN
+    m.confirmation = 0
+    m.param1 = 3 // 3 = shutdown & reboot into the bootloader
+    m.param2 = 0
+    m.param3 = 0
+    m.param4 = 0
+    m.param5 = 0
+    m.param6 = 0
+    m.param7 = 0
+    void writeMavlink(encodeMavlink2(m))
+  },
   /** Send an ESC action. `command`: 1=cal hold MAX, 2=cal hold MIN, 3=stop all. */
   escCommand(target: number, command: number) {
     const m = new SckyEscCmd()
@@ -883,18 +913,23 @@ export const bus = {
     m.command = command
     void writeMavlink(encodeMavlink2(m))
   },
-  /** Set battery pack config (cellsConfig 0 = auto, else fixed count; capacity mAh).
-   *  Persisted locally and applied to the charge estimate immediately. */
-  setBatteryConfig(patch: { cellsConfig?: number; capacity?: number }) {
+  /** Set battery pack config (cellsConfig 0 = auto, else fixed count; capacity mAh;
+   *  vbatCal = voltage calibration multiplier). Persisted locally and applied
+   *  immediately. */
+  setBatteryConfig(patch: { cellsConfig?: number; capacity?: number; vbatCal?: number }) {
     if (patch.cellsConfig !== undefined) snap.battery.cellsConfig = patch.cellsConfig
     if (patch.capacity !== undefined) snap.battery.capacity = patch.capacity
-    // Re-apply the estimate with the new cell count against the latest voltage.
-    const cells = snap.battery.cellsConfig > 0 ? snap.battery.cellsConfig : detectCells(snap.battery.voltage)
+    if (patch.vbatCal !== undefined && patch.vbatCal > 0) snap.battery.vbatCal = patch.vbatCal
+    // Re-apply calibrated voltage + charge estimate.
+    const v = snap.battery.voltageRaw * snap.battery.vbatCal
+    snap.battery.voltage = v
+    const cells = snap.battery.cellsConfig > 0 ? snap.battery.cellsConfig : detectCells(v)
     snap.battery.cells = cells || snap.battery.cells
-    if (snap.battery.voltage > 0) snap.battery.percent = socPercent(snap.battery.voltage, cells)
+    if (v > 0) snap.battery.percent = socPercent(v, cells)
     try {
       localStorage.setItem(BATT_CFG_KEY, JSON.stringify({
         cellsConfig: snap.battery.cellsConfig, capacity: snap.battery.capacity,
+        vbatCal: snap.battery.vbatCal,
       }))
     } catch { /* ignore */ }
     notify()

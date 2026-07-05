@@ -2,7 +2,17 @@
 // Top horizontal bar with branding, telemetry summary, and clock
 
 import { useTelemetry } from '../../system/hooks'
+import { bus } from '../../system/telemetry'
 import { DRONE_NAME, FIRMWARE_VER } from '../../system/fake'
+
+function rebootToDfu() {
+  const ok = window.confirm(
+    'Reboot the flight controller into the DFU bootloader?\n\n' +
+      'The USB serial link will drop and a DFU device will appear, ready to flash\n' +
+      'new firmware. Power-cycle the board to return to normal operation.'
+  )
+  if (ok) bus.rebootToBootloader()
+}
 
 const pad = (n: number) => String(n).padStart(2, '0')
 
@@ -60,6 +70,9 @@ export function StatusBar() {
         </div>
       </div>
       <div className="sb-right">
+        <button className="sb-dfu" onClick={rebootToDfu} title="Reboot the FC into the DFU bootloader to flash firmware">
+          ⏏ DFU
+        </button>
         <span className="sb-fw">{FIRMWARE_VER}</span>
         <span className="sb-uptime">UP {uptime}</span>
         <span className="sb-clock">{time}</span>

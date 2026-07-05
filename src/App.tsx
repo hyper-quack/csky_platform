@@ -11,6 +11,7 @@ import { CoverageCard } from './components/widgets/CoverageCard'
 import { RecordingsCard } from './components/widgets/RecordingsCard'
 import { PointCloudViewer } from './components/widgets/PointCloudViewer'
 import { EscConfigView } from './components/widgets/EscConfigView'
+import { ControlTestView } from './components/widgets/ControlTestView'
 import { NavigationHUD } from './components/widgets/NavigationHUD'
 import { DroneModel } from './components/widgets/DroneModel'
 import { IMUCard } from './components/widgets/IMUCard'
@@ -35,7 +36,7 @@ export default function App() {
   const [soundOn, setSoundOn] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [connected, setConnected] = useState(false)
-  const [viewportMode, setViewportMode] = useState<'cloud' | 'esc'>('cloud')
+  const [viewportMode, setViewportMode] = useState<'cloud' | 'esc' | 'control'>('cloud')
 
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
@@ -97,11 +98,16 @@ export default function App() {
         <div className="viewport-area">
           {viewportMode === 'cloud' ? (
             <>
-              <PointCloudViewer onOpenEsc={() => setViewportMode('esc')} />
+              <PointCloudViewer
+                onOpenEsc={() => setViewportMode('esc')}
+                onOpenControl={() => setViewportMode('control')}
+              />
               <NavigationHUD />
             </>
-          ) : (
+          ) : viewportMode === 'esc' ? (
             <EscConfigView onClose={() => setViewportMode('cloud')} />
+          ) : (
+            <ControlTestView onClose={() => setViewportMode('cloud')} />
           )}
         </div>
 

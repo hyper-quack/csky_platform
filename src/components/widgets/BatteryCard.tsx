@@ -68,6 +68,23 @@ export function BatteryCard({ index }: { index: number }) {
               onChange={e => bus.setBatteryConfig({ capacity: Number(e.target.value) })}
             />
           </label>
+          <label className="batt-cfg-row">
+            <span className="mono-sub dim">Calibrate: measured V</span>
+            <input
+              type="number" min={0} max={30} step={0.01} placeholder="meter reading"
+              onBlur={e => {
+                const actual = Number(e.target.value)
+                if (actual > 0 && batt.voltageRaw > 0) {
+                  bus.setBatteryConfig({ vbatCal: actual / batt.voltageRaw })
+                  e.target.value = ''
+                }
+              }}
+            />
+          </label>
+          <div className="batt-cfg-row">
+            <span className="mono-sub dim">sensed</span>
+            <span className="mono-sub">{batt.voltageRaw.toFixed(2)}V ×{batt.vbatCal.toFixed(3)}</span>
+          </div>
         </div>
       )}
     </Card>

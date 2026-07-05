@@ -103,7 +103,7 @@ function GridHelper() {
   )
 }
 
-export function PointCloudViewer({ onOpenEsc }: { onOpenEsc?: () => void }) {
+export function PointCloudViewer({ onOpenEsc, onOpenControl }: { onOpenEsc?: () => void; onOpenControl?: () => void }) {
   return (
     <div className="point-cloud-viewer" id="point-cloud-viewer">
       <div className="pcv-sidebar">
@@ -111,6 +111,11 @@ export function PointCloudViewer({ onOpenEsc }: { onOpenEsc?: () => void }) {
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="3" />
             <path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2" />
+          </svg>
+        </button>
+        <button className="pcv-icon" aria-label="control-test" title="Control Test (geometric SE(3))" onClick={onOpenControl}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 12h4l3 8 4-16 3 8h4" />
           </svg>
         </button>
         <button className="pcv-icon" aria-label="fullscreen">
