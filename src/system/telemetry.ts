@@ -803,6 +803,98 @@ function frame(t: number) {
   for (const d of drawers) d(t / 1000, dt)
 }
 
+// --- Demo mode: simulated telemetry for evaluating the UI without a flight
+// controller attached. Drives the same DroneSnapshot the real MAVLink path
+// fills in, so every widget renders exactly as it would in flight.
+let demoTimer = 0
+
+function demoTick() {
+  const now = Date.now()
+  const t = (now - bootAt) / 1000
+  snap.timestamp = now
+  snap.uptime = t
+
+  const roll = Math.sin(t * 0.3) * 2.5
+  const pitch = Math.cos(t * 0.22) * 1.8
+  const imuBase = {
+    health: 'OK' as const, whoami: 0x47, name: 'ICM-42688-P', lastUpdate: now, connected: true,
+  }
+  snap.imu1 = {
+    ...imuBase, roll, pitch,
+    acc: [Math.sin(t * 0.5) * 0.02, Math.cos(t * 0.4) * 0.02, 1 + Math.sin(t * 0.6) * 0.01],
+    gyr: [Math.sin(t) * 3, Math.cos(t) * 2, Math.sin(t * 0.5) * 1],
+  }
+  snap.imu2 = {
+    ...imuBase, roll: roll + 0.2, pitch: pitch - 0.2,
+    acc: [Math.sin(t * 0.5 + 0.1) * 0.02, Math.cos(t * 0.4 + 0.1) * 0.02, 1 + Math.sin(t * 0.6) * 0.01],
+    gyr: [Math.sin(t + 0.1) * 3, Math.cos(t + 0.1) * 2, Math.sin(t * 0.5) * 1],
+  }
+
+  snap.flight.mode = 'LOITER'
+  snap.flight.armed = true
+  snap.flight.heading = (t * 6) % 360
+  snap.flight.speed = 4.2 + Math.sin(t * 0.3)
+  snap.flight.verticalSpeed = Math.sin(t * 0.5) * 0.4
+  snap.flight.altitudeAGL = 120 + Math.sin(t * 0.2) * 3
+
+  snap.gps = {
+    lat: 34.05 + Math.sin(t * 0.05) * 0.0005, lon: -118.24 + Math.cos(t * 0.05) * 0.0005,
+    alt: 420.3, satellites: 14, fix: '3D', hdop: 0.9, receiving: true,
+  }
+  snap.compass = { present: true, healthy: true }
+  snap.radio = { rssi: -58 + Math.sin(t) * 3, noise: -95, signalStrength: 82 }
+
+  snap.rc.channels = [1500, 1500, 1500, 1500, 1000, 1000, 1500, 1500]
+  snap.rc.linkQuality = 98
+  snap.rc.rssi = -52
+  snap.rc.frames++
+  snap.rc.lastUpdate = now
+
+  snap.nav = {
+    lidarHeight: snap.flight.altitudeAGL, lidarValid: true,
+    flowVx: Math.sin(t * 0.4) * 0.3, flowVy: Math.cos(t * 0.4) * 0.3,
+    flowQuality: 220, flowValid: true, lastUpdate: now,
+  }
+  snap.baro = {
+    pressure: 1008 - snap.flight.altitudeAGL * 0.12, temperature: 24 + Math.sin(t * 0.1),
+    altitude: snap.flight.altitudeAGL + 300, relAltitude: snap.flight.altitudeAGL,
+    valid: true, lastUpdate: now,
+  }
+  snap.proximity = {
+    left: 6.2 + Math.sin(t * 0.3), leftValid: true,
+    right: 4.8 + Math.cos(t * 0.3), rightValid: true, lastUpdate: now,
+  }
+  snap.ekf = {
+    x: Math.sin(t * 0.1) * 10, y: Math.cos(t * 0.1) * 10, z: -snap.flight.altitudeAGL,
+    vx: Math.cos(t * 0.1), vy: -Math.sin(t * 0.1), vz: 0, converged: true, lastUpdate: now,
+  }
+
+  snap.battery.voltageRaw = 22.4 - t * 0.0005
+  snap.battery.voltage = snap.battery.voltageRaw * snap.battery.vbatCal
+  snap.battery.current = 12.3 + Math.sin(t * 0.5)
+  snap.battery.mAh = Math.min(4364, t * 3)
+  snap.battery.cells = 6
+  snap.battery.temperature = 36
+  snap.battery.percent = Math.max(0, 87 - t * 0.01)
+
+  for (let i = 0; i < 4; i++) {
+    const m = snap.esc.motors[i]
+    m.rpm = 6200 + Math.sin(t * 2 + i) * 150
+    m.voltage = 3.75
+    m.current = 3.05 + Math.sin(t + i) * 0.2
+    m.temp = 41 + i
+    m.error = 0
+  }
+  snap.esc.config.masterEnabled = true
+  snap.esc.mah = snap.battery.mAh
+  snap.esc.totalCurrent = snap.battery.current
+  snap.esc.lastTelem = now
+
+  snap.pointCloudCount = 48200
+
+  notify()
+}
+
 let autoSweep = false
 let sweepTimer = 0
 
@@ -942,11 +1034,26 @@ export const bus = {
     last = performance.now()
     raf = requestAnimationFrame(frame)
   },
+  /** Simulate a flight with no hardware attached — for evaluating the UI or
+   *  taking screenshots. Fills the same DroneSnapshot the MAVLink path would. */
+  startDemo() {
+    if (running) return
+    running = true
+    document.addEventListener('visibilitychange', onVisibility)
+    last = performance.now()
+    raf = requestAnimationFrame(frame)
+    demoTick()
+    demoTimer = window.setInterval(demoTick, 150)
+    startPeriodicLog()
+    pushLog('[SYS] DEMO MODE — simulated telemetry, no flight controller attached')
+  },
   stop() {
     if (!running) return
     running = false
     cancelAnimationFrame(raf)
     clearInterval(sweepTimer)
+    clearInterval(demoTimer)
+    demoTimer = 0
     stopPeriodicLog()
     document.removeEventListener('visibilitychange', onVisibility)
   },

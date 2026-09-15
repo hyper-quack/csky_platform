@@ -35,7 +35,8 @@ export default function App() {
   const [autoSweep, setAutoSweepState] = useState(false)
   const [soundOn, setSoundOn] = useState(true)
   const [paletteOpen, setPaletteOpen] = useState(false)
-  const [connected, setConnected] = useState(false)
+  const isDemo = useMemo(() => new URLSearchParams(window.location.search).get('demo') === '1', [])
+  const [connected, setConnected] = useState(isDemo)
   const [viewportMode, setViewportMode] = useState<'cloud' | 'esc' | 'control'>('cloud')
 
   useEffect(() => {
@@ -70,10 +71,11 @@ export default function App() {
 
   useEffect(() => {
     if (connected) {
-      bus.start()
+      if (isDemo) bus.startDemo()
+      else bus.start()
       return () => bus.stop()
     }
-  }, [connected])
+  }, [connected, isDemo])
 
   if (!connected) {
     return <ConnectionOverlay onConnected={() => setConnected(true)} />
