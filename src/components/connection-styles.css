@@ -39,3 +39,12 @@
 .conn-btn:disabled{
   opacity:0.5;cursor:not-allowed;
 }
+.conn-demo-link{
+  display:block;margin-top:20px;
+  font:400 11px/1.5 'Space Mono',monospace;letter-spacing:.04em;
+  color:var(--text-secondary);text-decoration:none;
+  transition:color .2s;
+}
+.conn-demo-link:hover{
+  color:var(--accent);
+}

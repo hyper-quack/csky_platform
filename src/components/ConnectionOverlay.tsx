@@ -205,6 +205,16 @@ export function ConnectionOverlay({ onConnected }: { onConnected: () => void }) 
         <button className="conn-btn" onClick={handleConnect} disabled={connecting}>
           {connecting ? 'CONNECTING...' : 'CONNECT USB'}
         </button>
+        <a
+          className="conn-demo-link"
+          href="?demo=1"
+          onClick={e => {
+            e.preventDefault()
+            window.location.search = '?demo=1'
+          }}
+        >
+          No hardware? Try the demo →
+        </a>
       </div>
     </motion.div>
   )

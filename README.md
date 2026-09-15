@@ -5,7 +5,67 @@ to a flight controller over **WebSerial** (USB CDC), decodes telemetry in the br
 and renders it as a live dashboard with 3D point-cloud and attitude visualisation.
 
 No backend, no agent, no installer. It is a static Vite + React app: open the page,
-press connect, pick the serial port.
+press connect, pick the serial port, and the flight controller's own MAVLink stream
+drives every widget on screen.
+
+![CSKY Platform dashboard — live telemetry, point cloud, IMU/GPS/EKF cards](docs/screenshots/dashboard-main.png)
+
+**No drone on hand?** Open the app and click *"No hardware? Try the demo"*, or go
+straight to `?demo=1` — a simulated MAVLink stream drives the whole UI so you can see
+the platform end-to-end without a flight controller. See [Demo mode](#demo-mode).
+
+---
+
+## What this is for
+
+A quadcopter (`CSKY-01`) reports its state over a USB-serial MAVLink 2 link, and this
+app is the pilot/operator console for it, entirely inside a browser tab:
+
+- **See** what the aircraft's sensors are reporting right now — IMU, GPS, EKF fusion,
+  barometer, optical flow, downward lidar, side proximity, radio link, RC input,
+  battery — each on its own live card, no polling delay.
+- **Watch** the environment being mapped: a live point-cloud viewport with a 3D drone
+  marker and a heading/attitude HUD overlaid on top.
+- **Configure** the four analog ESCs — remap logical motors to physical outputs,
+  calibrate min/max throttle pulses, spin one motor at a time to verify wiring, or cut
+  all four instantly.
+- **Sanity-check flight logic before it flies** — the Control Test bench runs the same
+  geometric SE(3) controller math as the firmware against a simulated rigid body in
+  the browser, so a gain change or a new scenario (upside-down recovery, a step input,
+  a circle) can be watched before it's ever tried in the air.
+- **Calibrate the battery reading** against a multimeter (Betaflight-style voltage
+  multiplier), and **reboot into DFU** to reflash firmware — without touching the
+  board.
+
+Everything above is driven by messages this app parses and encodes itself: there is no
+MAVLink or serial library doing the work underneath it (see
+[Architecture](#architecture)).
+
+---
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Main dashboard](docs/screenshots/dashboard-main.png) **Main dashboard** — point cloud viewport, 3D drone model, IMU/GPS/EKF/baro/proximity/battery cards, attitude HUD, telemetry feed. | ![ESC / motor configuration](docs/screenshots/dashboard-esc-config.png) **ESC / motor configuration** — per-motor throttle test, output remap, min/max pulse calibration, live power draw. |
+| ![Control test bench](docs/screenshots/dashboard-control-test.png) **Control test bench** — in-browser SE(3) controller simulation: pick a scenario, watch the reaction, tune mixer gains before flying. | ![Command palette](docs/screenshots/dashboard-command-palette.png) **Command palette** (`Cmd/Ctrl+K`) — focus mode, motion FX, sound, resync, all from the keyboard. |
+| ![Connection overlay](docs/screenshots/dashboard-connect-overlay.png) **Connection overlay** — the screen shown before a flight controller is attached, with a one-click path into demo mode. | |
+
+---
+
+## Demo mode
+
+Every screenshot above (except the connection overlay itself) was taken with **demo
+mode**: append `?demo=1` to the URL, or click *"No hardware? Try the demo"* on the
+connection screen, and the app skips WebSerial entirely and drives the UI from a
+simulated `DroneSnapshot` (`bus.startDemo()` in `src/system/telemetry.ts`) — a plausible
+loitering flight with moving IMU/GPS/EKF/battery/ESC values, refreshed a few times a
+second. It's the same rendering path real telemetry uses, so every widget behaves as it
+would in flight; only the uplink (ESC commands, DFU reboot) is a no-op since there's no
+serial port to write to.
+
+Use it to preview the UI, take screenshots, or develop/review widget code without a
+flight controller on the desk.
 
 ---
 
@@ -24,6 +84,8 @@ press connect, pick the serial port.
 - **DFU / bootloader reboot** — reboot the FC into its bootloader from the UI.
 - **Command palette** — `Cmd/Ctrl + K`.
 - **Telemetry log feed** — human-readable decoded message stream, pausable.
+- **Demo mode** — `?demo=1` drives every widget from simulated telemetry, no
+  flight controller required. See [Demo mode](#demo-mode).
 
 ---
 
@@ -167,6 +229,7 @@ the MAVLink shim).
 | "Failed to open serial port" | Another application holds the port; close your other GCS or serial monitor |
 | Telemetry frozen | FC rebooted or cable dropped: reload the page and reconnect |
 | Battery percentage looks wrong | Set cell count and `vbatCal` in the battery card |
+| Want to check the UI without hardware | Use `?demo=1` (see [Demo mode](#demo-mode)) |
 
 ## Safety
 
